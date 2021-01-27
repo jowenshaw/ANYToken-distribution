@@ -187,9 +187,9 @@ var (
 		Usage: "dry run",
 	}
 	// GatewayFlag --gateway
-	GatewayFlag = &cli.StringFlag{
+	GatewayFlag = &cli.StringSliceFlag{
 		Name:  "gateway",
-		Usage: "gateway URL address",
+		Usage: "gateway URL address slice",
 	}
 	// SenderFlag --sender
 	SenderFlag = &cli.StringFlag{

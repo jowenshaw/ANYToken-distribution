@@ -1,7 +1,6 @@
 package syncer
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -15,12 +14,11 @@ import (
 	"github.com/anyswap/ANYToken-distribution/params"
 	"github.com/fsn-dev/fsn-go-sdk/efsn/common"
 	"github.com/fsn-dev/fsn-go-sdk/efsn/core/types"
-	"github.com/fsn-dev/fsn-go-sdk/efsn/ethclient"
 )
 
 var (
 	// configurable syncer items
-	serverURL    string
+	serverURL    []string
 	overwrite           = false
 	jobCount     uint64 = 4
 	waitInterval uint64 = 6 // seconds
@@ -36,9 +34,7 @@ var (
 	retryDuration = time.Duration(1) * time.Second
 	waitDuration  = time.Duration(waitInterval) * time.Second
 
-	client     *ethclient.Client
-	cliContext = context.Background()
-	workers    []*worker
+	workers []*worker
 
 	hasSyncToLatest bool
 	onlySyncAccount bool
@@ -138,22 +134,6 @@ func Start(apiCaller *callapi.APICaller, onlySyncAcc bool) {
 	}
 }
 
-func dialServer() (err error) {
-	client, err = ethclient.Dial(serverURL)
-	if err != nil {
-		log.Error("[syncer] client connection error", "server", serverURL, "err", err)
-		return err
-	}
-	log.Info("[syncer] client connection succeed", "server", serverURL)
-	return nil
-}
-
-func closeClient() {
-	if client != nil {
-		client.Close()
-	}
-}
-
 // WaitSyncToLatest wait sync to latest block (wait doLoopWork start)
 func WaitSyncToLatest() {
 	for !hasSyncToLatest {
@@ -197,7 +177,7 @@ func (s *syncer) getStartAndLast() (start, last uint64) {
 		}
 	}
 	for s.end == 0 {
-		latestHeader, err := client.HeaderByNumber(cliContext, nil)
+		latestHeader, err := getHeaderByNumber(nil)
 		if err == nil {
 			last = latestHeader.Number.Uint64()
 			if last > s.stable {
@@ -335,7 +315,7 @@ func (w *worker) doSync(wg *sync.WaitGroup) {
 			break
 		}
 		if height+w.stable > latest {
-			latestHeader, err := client.HeaderByNumber(cliContext, nil)
+			latestHeader, err := getHeaderByNumber(nil)
 			if err != nil {
 				log.Warn("[syncer] get latest block header failed", "id", w.id, "err", err)
 				time.Sleep(retryDuration)
@@ -404,7 +384,7 @@ func (w *worker) syncRange(start, end uint64) {
 		for height <= to {
 			mb := getSynced(mblocks, height)
 			if overwrite || mb == nil {
-				block, err := client.BlockByNumber(cliContext, new(big.Int).SetUint64(height))
+				block, err := getBlockByNumber(new(big.Int).SetUint64(height))
 				if err != nil {
 					log.Warn("[syncer] get block failed", "id", w.id, "number", height, "err", err)
 					time.Sleep(retryDuration)
@@ -429,7 +409,7 @@ func (w *worker) syncRange(start, end uint64) {
 
 func loopGetReceipt(txHash common.Hash) *types.Receipt {
 	for {
-		receipt, err := client.TransactionReceipt(cliContext, txHash)
+		receipt, err := getTransactionReceipt(txHash)
 		if err == nil {
 			return receipt
 		}

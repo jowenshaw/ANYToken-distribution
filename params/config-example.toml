@@ -9,7 +9,7 @@ UserName = "username"
 Password = "password"
 
 [Gateway]
-APIAddress = "https://testnet.fsn.dev/api"
+APIAddress = ["https://testnet.fsn.dev/api"]
 AverageBlockTime = 13 # seconds
 
 [Sync]

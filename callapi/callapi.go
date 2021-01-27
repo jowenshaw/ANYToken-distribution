@@ -14,7 +14,7 @@ import (
 
 // APICaller encapsulate ethclient
 type APICaller struct {
-	client           *ethclient.Client
+	clients          []*ethclient.Client
 	context          context.Context
 	rpcRetryCount    int
 	rpcRetryInterval time.Duration
@@ -39,28 +39,34 @@ func NewAPICaller(ctx context.Context, retryCount int, retryInterval time.Durati
 }
 
 // DialServer dial server and assign client
-func (c *APICaller) DialServer(serverURL string) (err error) {
-	c.client, err = ethclient.Dial(serverURL)
-	if err != nil {
-		log.Error("[callapi] client connection error", "server", serverURL, "err", err)
-		return err
+func (c *APICaller) DialServer(serverURL []string) (err error) {
+	var client *ethclient.Client
+	for _, url := range serverURL {
+		client, err = ethclient.Dial(url)
+		if err != nil {
+			log.Error("[callapi] client connection error", "server", url, "err", err)
+			return err
+		}
+		log.Info("[callapi] client connection succeed", "server", url)
+		c.clients = append(c.clients, client)
 	}
-	log.Info("[callapi] client connection succeed", "server", serverURL)
 	c.LoopGetLatestBlockHeader()
 	return nil
 }
 
 // CloseClient close client
 func (c *APICaller) CloseClient() {
-	if c.client != nil {
-		c.client.Close()
+	for _, client := range c.clients {
+		if client != nil {
+			client.Close()
+		}
 	}
 }
 
 // GetCoinBalance get coin balance
 func (c *APICaller) GetCoinBalance(account common.Address, blockNumber *big.Int) (balance *big.Int, err error) {
 	for i := 0; i < c.rpcRetryCount; i++ {
-		balance, err = c.client.BalanceAt(c.context, account, blockNumber)
+		balance, err = c.BalanceAt(account, blockNumber)
 		if err == nil {
 			break
 		}
@@ -142,30 +148,98 @@ func (c *APICaller) GetExchangeFactoryAddress(exchange common.Address) common.Ad
 	return common.BytesToAddress(common.GetData(res, 0, 32))
 }
 
+// BalanceAt get account balance
+func (c *APICaller) BalanceAt(account common.Address, blockNumber *big.Int) (balance *big.Int, err error) {
+	for _, client := range c.clients {
+		balance, err = client.BalanceAt(c.context, account, blockNumber)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
 // GetAccountNonce get account nonce
-func (c *APICaller) GetAccountNonce(account common.Address) (uint64, error) {
-	return c.client.PendingNonceAt(c.context, account)
+func (c *APICaller) GetAccountNonce(account common.Address) (nonce uint64, err error) {
+	for _, client := range c.clients {
+		nonce, err = client.PendingNonceAt(c.context, account)
+		if err == nil {
+			return
+		}
+	}
+	return
 }
 
 // SendTransaction send signed tx
-func (c *APICaller) SendTransaction(tx *types.Transaction) error {
-	return c.client.SendTransaction(c.context, tx)
+func (c *APICaller) SendTransaction(tx *types.Transaction) (err error) {
+	for _, client := range c.clients {
+		err = client.SendTransaction(c.context, tx)
+		if err == nil {
+			return
+		}
+	}
+	return
 }
 
 // GetChainID get chain ID, also known as network ID
-func (c *APICaller) GetChainID() (*big.Int, error) {
-	return c.client.NetworkID(c.context)
+func (c *APICaller) GetChainID() (chainID *big.Int, err error) {
+	for _, client := range c.clients {
+		chainID, err = client.NetworkID(c.context)
+		if err == nil {
+			return
+		}
+	}
+	return
 }
 
 // SuggestGasPrice suggest gas price
-func (c *APICaller) SuggestGasPrice() (*big.Int, error) {
-	return c.client.SuggestGasPrice(c.context)
+func (c *APICaller) SuggestGasPrice() (gasPrice *big.Int, err error) {
+	for _, client := range c.clients {
+		gasPrice, err = client.SuggestGasPrice(c.context)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+// SyncProgress get sync process
+func (c *APICaller) SyncProgress() (progress *ethereum.SyncProgress, err error) {
+	for _, client := range c.clients {
+		progress, err = client.SyncProgress(c.context)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+// DoCall call contract
+func (c *APICaller) DoCall(msg *ethereum.CallMsg, blockNumber *big.Int) (res []byte, err error) {
+	for _, client := range c.clients {
+		res, err = client.CallContract(c.context, *msg, blockNumber)
+		if err == nil {
+			return
+		}
+	}
+	return
+}
+
+// HeaderByNumber get header by number
+func (c *APICaller) HeaderByNumber(blockNumber *big.Int) (header *types.Header, err error) {
+	for _, client := range c.clients {
+		header, err = client.HeaderByNumber(c.context, blockNumber)
+		if err == nil {
+			return
+		}
+	}
+	return
 }
 
 // GetSyncProgress get full node syncing state
 func (c *APICaller) GetSyncProgress() *ethereum.SyncProgress {
 	for {
-		progress, err := c.client.SyncProgress(c.context)
+		progress, err := c.SyncProgress()
 		if err == nil {
 			log.Info("call eth_syncing success", "progress", progress)
 			return progress
@@ -177,12 +251,12 @@ func (c *APICaller) GetSyncProgress() *ethereum.SyncProgress {
 
 // CallContract common call contract
 func (c *APICaller) CallContract(contract common.Address, data []byte, blockNumber *big.Int) (res []byte, err error) {
-	msg := ethereum.CallMsg{
+	msg := &ethereum.CallMsg{
 		To:   &contract,
 		Data: data,
 	}
 	for i := 0; i < c.rpcRetryCount; i++ {
-		res, err = c.client.CallContract(c.context, msg, blockNumber)
+		res, err = c.DoCall(msg, blockNumber)
 		if err == nil {
 			break
 		}

@@ -48,7 +48,7 @@ type MongoDBConfig struct {
 
 // GatewayConfig struct
 type GatewayConfig struct {
-	APIAddress       string
+	APIAddress       []string
 	AverageBlockTime uint64
 }
 

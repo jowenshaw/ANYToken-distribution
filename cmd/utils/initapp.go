@@ -14,15 +14,15 @@ import (
 
 // InitApp init app (remember close client in the caller)
 func InitApp(ctx *cli.Context, withConfigFile bool) *callapi.APICaller {
-	return initApp(ctx, withConfigFile, "")
+	return initApp(ctx, withConfigFile, nil)
 }
 
 // InitAppWithURL init app for library use (remember close client in the caller)
-func InitAppWithURL(ctx *cli.Context, serverURL string, withConfigFile bool) *callapi.APICaller {
+func InitAppWithURL(ctx *cli.Context, serverURL []string, withConfigFile bool) *callapi.APICaller {
 	return initApp(ctx, withConfigFile, serverURL)
 }
 
-func initApp(ctx *cli.Context, withConfigFile bool, serverURL string) *callapi.APICaller {
+func initApp(ctx *cli.Context, withConfigFile bool, serverURL []string) *callapi.APICaller {
 	SetLogger(ctx)
 
 	if !withConfigFile {
@@ -36,7 +36,7 @@ func initApp(ctx *cli.Context, withConfigFile bool, serverURL string) *callapi.A
 
 	InitMongodb()
 
-	if serverURL == "" {
+	if len(serverURL) == 0 {
 		serverURL = params.GetConfig().Gateway.APIAddress
 	}
 
@@ -50,7 +50,7 @@ func initApp(ctx *cli.Context, withConfigFile bool, serverURL string) *callapi.A
 }
 
 // DialServer connect to serverURL
-func DialServer(serverURL string) *callapi.APICaller {
+func DialServer(serverURL []string) *callapi.APICaller {
 	capi := callapi.NewDefaultAPICaller()
 	for {
 		err := capi.DialServer(serverURL)

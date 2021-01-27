@@ -45,8 +45,8 @@ send rewards batchly according to verified input file with line format: <address
 )
 
 func sendRewards(ctx *cli.Context) error {
-	serverURL := ctx.String(utils.GatewayFlag.Name)
-	if serverURL == "" {
+	serverURL := ctx.StringSlice(utils.GatewayFlag.Name)
+	if len(serverURL) == 0 {
 		return fmt.Errorf("must specify gateway URL")
 	}
 	rewardType := ctx.String(utils.RewardTyepFlag.Name)

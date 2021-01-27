@@ -13,7 +13,7 @@ import (
 // LoopGetBlockHeader loop get block header
 func (c *APICaller) LoopGetBlockHeader(blockNumber *big.Int) *types.Header {
 	for {
-		header, err := c.client.HeaderByNumber(c.context, blockNumber)
+		header, err := c.HeaderByNumber(blockNumber)
 		if err == nil {
 			return header
 		}
@@ -25,7 +25,7 @@ func (c *APICaller) LoopGetBlockHeader(blockNumber *big.Int) *types.Header {
 // LoopGetLatestBlockHeader loop get latest block header
 func (c *APICaller) LoopGetLatestBlockHeader() *types.Header {
 	for {
-		header, err := c.client.HeaderByNumber(c.context, nil)
+		header, err := c.HeaderByNumber(nil)
 		if err == nil {
 			log.Info("[callapi] get latest block header succeed.",
 				"number", header.Number,
@@ -124,12 +124,12 @@ func (c *APICaller) loopGetFactoryExcahngeOrToken(factory, address common.Addres
 		copy(data[:4], getTokenFuncHash)
 	}
 	copy(data[4:], address.Hash().Bytes())
-	msg := ethereum.CallMsg{
+	msg := &ethereum.CallMsg{
 		To:   &factory,
 		Data: data,
 	}
 	for {
-		res, err = c.client.CallContract(c.context, msg, nil)
+		res, err = c.DoCall(msg, nil)
 		if err == nil {
 			break
 		}
@@ -147,12 +147,12 @@ func (c *APICaller) LoopGetFactoryTokenCount(factory common.Address) uint64 {
 
 		getTokenCountFuncHash = common.FromHex("0x9f181b5e")
 	)
-	msg := ethereum.CallMsg{
+	msg := &ethereum.CallMsg{
 		To:   &factory,
 		Data: getTokenCountFuncHash,
 	}
 	for i := 0; i < c.rpcRetryCount; i++ {
-		res, err = c.client.CallContract(c.context, msg, nil)
+		res, err = c.DoCall(msg, nil)
 		if err == nil {
 			break
 		}
@@ -173,12 +173,12 @@ func (c *APICaller) LoopGetFactoryTokenWithID(factory common.Address, id uint64)
 	data := make([]byte, 36)
 	copy(data[:4], getTokenWithIDFuncHash)
 	copy(data[4:], common.BigToHash(new(big.Int).SetUint64(id)).Bytes())
-	msg := ethereum.CallMsg{
+	msg := &ethereum.CallMsg{
 		To:   &factory,
 		Data: data,
 	}
 	for i := 0; i < c.rpcRetryCount; i++ {
-		res, err = c.client.CallContract(c.context, msg, nil)
+		res, err = c.DoCall(msg, nil)
 		if err == nil {
 			break
 		}
